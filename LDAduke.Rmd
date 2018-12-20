@@ -1,0 +1,133 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+##install.packages ("topicmodels")
+##install.packages ("dplyr")
+##install.packages ("tidytext")
+##install.packages ("tidyr")
+##install.packages ("tmcn")   ##tm own stopwords
+```{r}
+#import data
+library("tm", lib.loc="E:/Anaconda3/Lib/R/library")
+library(tmcn)
+
+setwd("D://网络接单//数据分析//20181205-python+r-DUKESTUDENT-BLOGWORDS")
+rm(list=ls())
+resutf8<-read.csv("studentblog.txt", stringsAsFactors=FALSE,header=FALSE)
+email<-Corpus(VectorSource(resutf8), readerControl = list(language="UTF-8"))
+```
+#import data
+library("tm", lib.loc="E:/Anaconda3/Lib/R/library")
+library(tmcn)
+
+resutf8<-read.table("C:/Users/zjyfi/Desktop/email.txt",stringsAsFactors=F)
+email<-Corpus(VectorSource(resutf8), readerControl = list(language="UTF-8"))
+
+```{r}
+#add stopwords
+stopwords("en") 
+mystopwords<-c("clintonemailcom", "stategov", "hrod", "pls", "can", "will")
+words = union(mystopwords,stopwords("en"))
+```
+
+```{r}
+#get DTM-AssociatedPress
+controllist<-list(wordLengths=c(2,Inf),removeNumbers=TRUE,weighting=weightTf,removePunctuation = TRUE,stopwords = words)
+AssociatedPress <- DocumentTermMatrix(email,control = controllist[0])  
+```
+
+```{r}
+#get topicmodels
+library("topicmodels")
+```
+
+```{r}
+# set a seed so that the output of the model is predictable
+ap_lda <- LDA(AssociatedPress, k = 2, control = list(seed = 1234))
+ap_lda
+```
+
+```{r}
+# word topic probability
+
+library(tidytext)
+
+ap_topics <- tidy(ap_lda, matrix = "beta")
+ap_topics
+
+
+library(ggplot2)
+library(dplyr)
+
+
+ap_top_terms <- ap_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ap_top_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip()
+
+
+library(tidyr)
+
+beta_spread <- ap_topics %>%
+  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))%>%
+  arrange(desc(log_ratio ))
+
+```
+
+```{r}
+##top 10 most frequently occurred words
+beta_spread
+
+beta_spread %>%
+  group_by(log_ratio < 0) %>%
+  top_n(10, abs(log_ratio)) %>%
+   ungroup() %>%
+  mutate(term = reorder(term, log_ratio)) %>%
+  ggplot(aes(term, log_ratio, fill = log_ratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() 
+
+```
+
+```{r}
+#document-topic probability
+
+ap_documents <- tidy(ap_lda, matrix = "gamma")
+ap_documents
+
+tidy(AssociatedPress) %>%
+  filter(document == 6) %>%
+  arrange(desc(count))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
